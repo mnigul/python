@@ -1,7 +1,20 @@
 import os
 import gzip
 import urllib
+import argparse
  
+parser = argparse.ArgumentParser(description='Apache2 log parser.')
+
+parser.add_argument('--path', 
+	help="Path to Apache2 files", default="/var/log/apache2")
+parser.add_argument('--top-urls', 
+	help="Find top URL-s", action='store_true')
+parser.add_argument('--geoip', 
+	help="Resolve IP-s to country codes", action='store_true')
+parser.add_argument('-verbose',
+	help="Increase verbosity", action="store_true")
+args = parser.parse_args()
+
 # Following is the directory with log files,
 # On Windows substitute it where you downloaded the files
 root = "/home/mnigul/logs"
@@ -12,14 +25,14 @@ urls = {}
 users = {}
 total = 0
  
-for filename in os.listdir(root):
+for filename in os.listdir(args.path):
     if not filename.startswith("access.log"):
         print "Skipping unknown file:", filename
         continue
     if filename.endswith(".gz"):
-        fh = gzip.open(os.path.join(root, filename))
+        fh = gzip.open(os.path.join(args.path, filename))
     else:
-        open(os.path.join(root, filename))
+        fh= open(os.path.join(args.path, filename))
     print "Going to process:", filename
     for line in fh:
             total = total + 1
@@ -66,15 +79,4 @@ results = users.items()
 results.sort(key = lambda item:item[1], reverse=True)
 for user, transfered_bytes in results[:5]:
     print user, "==>", transfered_bytes / (1024 * 1024), "MB"
-
-
-
-
-
-
-
-
-
-
-
 
