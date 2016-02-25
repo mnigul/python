@@ -2,7 +2,19 @@ import os
 import gzip
 import urllib
 import argparse
- 
+
+def humanize(bytes):
+	if bytes < 1024:
+		return "%d B" % bytes
+	elif bytes < 1024 ** 2: 
+		return "%.1f kB" % (bytes / 1024)
+	elif bytes < 1024 ** 3:
+		return "%.1f MB" % (bytes / 1024 ** 2)
+	elif bytes < 1024 ** 4:
+		return "%.1f GB" % (bytes / 1024 ** 3)
+	else:
+		return "%.1f TB" % (bytes / 1024.0 ** 4)
+
 parser = argparse.ArgumentParser(description='Apache2 log parser.')
 
 parser.add_argument('--path', 
@@ -78,5 +90,17 @@ for url, hits in results[:5]:
 results = users.items()
 results.sort(key = lambda item:item[1], reverse=True)
 for user, transfered_bytes in results[:5]:
-    print user, "==>", transfered_bytes / (1024 * 1024), "MB"
+    print user, "==>", humanize(transfered_bytes)
 
+print("Top 5 bandwidth hoggers:")
+results = user_bytes.items()
+results.sort(key = lambda item:item[1], reverse=True)
+for user, transferred_bytes in results[:5]:
+    print user, "==>", transferred_bytes / (1024 * 1024), "MB"
+    
+print
+print("Top 5 visited URL-s:")
+results = urls.items()
+results.sort(key = lambda item:item[1], reverse=True)
+for path, hits in results[:5]:
+    print "http://enos.itcollege.ee" + path, "==>", hits, "(", hits * 100 / total, "%)"
