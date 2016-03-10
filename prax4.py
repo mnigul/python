@@ -3,6 +3,9 @@ import os
 import urllib
 import GeoIP
 
+#print env.get_template("report.html").render(variable="blah")
+
+
 gi = GeoIP.open("GeoIP.dat", GeoIP.GEOIP_MEMORY_CACHE)
 
 parser = argparse.ArgumentParser(description='Apache2 log parser.')
@@ -11,10 +14,16 @@ parser.add_argument('--path',
 parser.add_argument('--top-urls',
     help="Find top URL-s", action='store_true')
 parser.add_argument('--geoip',
-    help="Resolve IP-s to country codes", default ="usr/share/GeoIP/GeoIP.dat")
+    help="Resolve IP-s to country codes", default ="/usr/share/GeoIP/GeoIP.dat")
 parser.add_argument('--verbose',
     help="Increase verbosity", action="store_true")
 args = parser.parse_args()
+
+try:
+	gi = GeoIP.open(args.geoip, GeoIP.GEOIP_MEMORY_CACHE)
+except:
+	print "Failed to open up GeoIP database, are you sure %s exists?" % args.geoip
+	exit(255)
 
 keywords = "Windows", "Linux", "OS X", "Ubuntu", "Googlebot", "bingbot", "Android", "YandexBot", "facebookexternalhit"
 d = {} 
@@ -90,24 +99,56 @@ def humanize(bytes):
         return "%.1f kB" % (bytes / 1024.0)
     elif bytes < 1024 ** 3:
         return "%.1f MB" % (bytes / 1024.0 ** 2)
-    else:
+    elif bytes < 1024 ** 4:
         return "%.1f GB" % (bytes / 1024.0 ** 3)
+    else:
+        return "%.1f TB" % (bytes / 1024.0 ** 4)
 
 from lxml import etree
 from lxml.cssselect import CSSSelector
  
 document =  etree.parse(open('BlankMap-World6.svg'))
 
+max_hits = max(countries.values())
+print("country with max amount of hits:", max_hits)
+
 for country_code, hits in countries.items():
-	sel = CSSSelector("#" + country_code)
+	if not country_code: continue #skip localhost
+	print country_code, hex(hits * 255 / max_hits)[2:] #2: skips 0x of hexadecimal numbers
+	sel = CSSSelector("#" + country_code.lower())
 	for j in sel(document):
-   	 j.set("style", "fill:red")
+	#This will make the tones of red different based on nr of hits
+   		#j.set("style", "fill:#" + hex(hits * 255 /max_hits)[2:] + "0000")
+		#120 dgr is green, 0 is red, 0 to max hits will be coloured green to red
+		j.set("style", "fill:hsl(%d, 60%%, 70%%);" % (120 - hits * 120 / max_hits))
     	# Remove styling from children
     	for i in j.iterfind("{http://www.w3.org/2000/svg}path"):
-      	  i.attrib.pop("class", "")
+      		i.attrib.pop("class", "")
  
-	with open("highlighted.svg", "w") as fh:
-   	 fh.write(etree.tostring(document))    
+with open("highlighted.svg", "w") as fh:
+	fh.write(etree.tostring(document))    
+
+from jinja2 import Environment, FileSystemLoader #this is the template engine we will use
+
+env = Environment(
+	loader=FileSystemLoader(os.path.dirname(__file__)),
+	trim_blocks=True)
+
+#user_bytes = sorted(user_bytes.items(), key = lambda item:item[1], reverse =True)
+
+import codecs
+with codecs.open("output.html", "w", encoding ="utf-8") as fh:
+	fh.write(env.get_template("report.html").render(
+		humanize = humanize, # this is the templating the engine will use
+		url_hits = sorted(urls.items(), key=lambda i:i[1], reverse=True),
+		user_bytes = sorted(user_bytes.items(), key = lambda item:item[1], reverse=True),
+		some_other_variable = "This is now also accessible from template"
+	))
+
+	# A more convenient way is: env.get_template("...").render(locals())
+	# locals() is a dict which contains all locally defined variables
+
+#os.system("x-www-browser file://" + os.path.realpath("output.html") + " &")
 
 print
 print("Top IP-addresses:")
@@ -118,8 +159,6 @@ for source_ip, hits in results[:5]:
 
 print
 print("Top 5 bandwidth hoggers:")
-results = user_bytes.items()
-results.sort(key = lambda item:item[1], reverse=True)
 for user, transferred_bytes in results[:5]:
     print user, "==>", humanize(transferred_bytes)
     
